@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Hạn Sử Dụng</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 1rem; background-color: #f0f2f5; color: #1c1e21; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #4285F4; }
+        label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+        .input-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .input-group input { flex-grow: 1; }
+        input, select, button { width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; box-sizing: border-box; }
+        button { border: none; color: white; cursor: pointer; }
+        #scanButton { background-color: #0F9D58; } /* Màu xanh lá */
+        #submitButton { background-color: #4285F4; margin-top: 1rem; } /* Màu xanh dương */
+        #reader { width: 100%; border: 1px dashed #ccc; border-radius: 8px; margin-bottom: 1rem; display: none; }
+        #message { text-align: center; margin-top: 1rem; font-weight: bold; }
+        .date-group { display: flex; gap: 1rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Nhập Hạn Sử Dụng</h2>
+
+    <div id="reader"></div>
+
+    <form id="dataForm">
+        <label for="barcodeInput">Barcode</label>
+        <div class="input-group">
+            <input type="text" id="barcodeInput" name="barcode" placeholder="Nhập tay hoặc quét mã" required>
+            <button type="button" id="scanButton">📷 Scan</button>
+        </div>
+
+        <label>Ngày / Tháng Hết Hạn</label>
+        <div class="date-group">
+            <input type="number" id="ngayInput" name="ngay" placeholder="Ngày" min="1" max="31" required>
+            <input type="number" id="thangInput" name="thang" placeholder="Tháng" min="1" max="12" required>
+        </div>
+
+        <button type="submit" id="submitButton">Lưu Dữ Liệu</button>
+    </form>
+
+    <div id="message"></div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<script>
+    const form = document.getElementById('dataForm');
+    const scanButton = document.getElementById('scanButton');
+    const barcodeInput = document.getElementById('barcodeInput');
+    const readerDiv = document.getElementById('reader');
+    const messageDiv = document.getElementById('message');
+    let isScannerOn = false;
+
+    // Khởi tạo trình quét mã
+    const html5QrCode = new Html5Qrcode("reader");
+
+    const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+        // Điền barcode vào ô input
+        barcodeInput.value = decodedText;
+        // Tắt camera sau khi quét thành công
+        stopScanner();
+    };
+
+    function startScanner() {
+        readerDiv.style.display = 'block';
+        scanButton.textContent = '📷 Đang quét...';
+        isScannerOn = true;
+        
+        // Bắt đầu quét bằng camera sau của điện thoại
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            qrCodeSuccessCallback,
+            (errorMessage) => { /* console.log(errorMessage); */ }
+        ).catch((err) => {
+            alert("Không thể khởi động camera. Vui lòng cấp quyền và thử lại.");
+            stopScanner();
+        });
+    }
+
+    function stopScanner() {
+        if (isScannerOn) {
+            html5QrCode.stop().then(() => {
+                readerDiv.style.display = 'none';
+                scanButton.textContent = '📷 Scan';
+                isScannerOn = false;
+            }).catch(err => console.error("Lỗi khi dừng camera:", err));
+        }
+    }
+    
+    // Xử lý khi nhấn nút Scan/Tắt
+    scanButton.addEventListener('click', () => {
+        if (isScannerOn) {
+            stopScanner();
+        } else {
+            startScanner();
+        }
+    });
+
+    // Xử lý khi gửi form
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        messageDiv.textContent = 'Đang lưu...';
+        messageDiv.style.color = 'black';
+
+        const formData = new FormData(form);
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxgDgzA9FB0fQcE0cpS9I62zwKq4f7y8dhlTukKJ2AcpI_JQtszQvYl2Uuav8DGu9a_AQ/exec'; // <--- THAY URL CỦA BẠN VÀO ĐÂY
+
+        fetch(scriptURL, { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if(data.result === 'success') {
+                    messageDiv.textContent = 'Lưu thành công!';
+                    messageDiv.style.color = 'green';
+                    form.reset(); // Xóa dữ liệu đã nhập
+                } else {
+                    throw new Error(data.message || 'Lưu thất bại');
+                }
+            })
+            .catch(error => {
+                messageDiv.textContent = 'Đã có lỗi xảy ra! ' + error.message;
+                messageDiv.style.color = 'red';
+            });
+    });
+</script>
+
+</body>
+</html>
